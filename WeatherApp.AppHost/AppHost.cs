@@ -1,12 +1,19 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var apiService = builder.AddProject<Projects.WeatherApp_ApiService>("apiservice")
-    .WithHttpHealthCheck("/health");
-
-builder.AddProject<Projects.WeatherApp_Web>("webfrontend")
-    .WithExternalHttpEndpoints()
+builder.AddDockerComposeEnvironment("compose")
+    .WithDashboard(enabled: false);
+var weatherApi = builder.AddProject<Projects.WeatherApp_ApiService>("apiservice")
     .WithHttpHealthCheck("/health")
-    .WithReference(apiService)
-    .WaitFor(apiService);
+    .PublishAsDockerComposeService((resource, service) =>
+    {
+        service.Name = "api";
+    });
+
+builder.AddNpmApp("frontend", "../WeatherApp.client", "dev")
+    .WithReference(weatherApi)
+    .WaitFor(weatherApi)
+    .WithHttpEndpoint(env: "PORT")
+    .WithExternalHttpEndpoints()
+    .PublishAsDockerFile();
 
 builder.Build().Run();
